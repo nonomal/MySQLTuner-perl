@@ -1,86 +1,292 @@
 # NAME
 
-    MySQLTuner 1.9.0 - MySQL High Performance Tuning Script
+    MySQLTuner 2.9.3 - MySQL High Performance Tuning Advisor for MySQL, MariaDB, and Percona Server
+
+# SYNOPSIS
+
+**mysqltuner** \[_OPTIONS_\]
+
+    # Basic local execution using standard unix socket
+    perl mysqltuner.pl
+
+    # Remote TCP/IP connection with explicit credentials and forced memory sizing
+    perl mysqltuner.pl --host 192.168.1.50 --port 3306 --user root --pass secret --forcemem 16G
+
+    # Containerized database analysis via Docker/Podman
+    perl mysqltuner.pl --container production_mysql_1 --user root --pass secret
+
+    # Generate comprehensive interactive HTML diagnostic dashboard
+    perl mysqltuner.pl --reportfile /var/www/html/tuner_report.html
+
+    # Export schema markdown documentation per database
+    perl mysqltuner.pl --schemadir /opt/db_docs/
+
+    # AI Agent integration output (actionable JSON remediation plan)
+    perl mysqltuner.pl --agent-json
 
 # IMPORTANT USAGE GUIDELINES
 
-To run the script with the default options, run the script without arguments
-Allow MySQL server to run for at least 24-48 hours before trusting suggestions
-Some routines may require root level privileges (script will provide warnings)
-You must provide the remote server's total memory when connecting to other servers
+- **Production Stability:** Run the script without modifying arguments first to review recommendations before applying changes.
+- **Representative Workload:** Allow your database server to run under normal production load for at least 24 to 48 hours before trusting metric ratios and sizing advice.
+- **Privilege Requirements:** Administrative read-only access (`SELECT`, `PROCESS`, `SHOW DATABASES`, `REPLICATION CLIENT`) is required for exhaustive diagnostics.
+- **Remote Host Hardware Sizing:** When connecting over TCP/IP or SSH to remote instances, specify host RAM via `--forcemem` (e.g., `--forcemem 32G`) to ensure accurate buffer sizing recommendations.
 
-# CONNECTION AND AUTHENTICATION
+# OPTIONS
 
-    --host <hostname>           Connect to a remote host to perform tests (default: localhost)
-    --socket <socket>           Use a different socket for a local connection
-    --port <port>               Port to use for connection (default: 3306)
-    --user <username>           Username to use for authentication
-    --userenv <envvar>          Name of env variable which contains username to use for authentication
-    --pass <password>           Password to use for authentication
-    --passenv <envvar>          Name of env variable which contains password to use for authentication
-    --ssl-ca <path>             Path to public key
-    --mysqladmin <path>         Path to a custom mysqladmin executable
-    --mysqlcmd <path>           Path to a custom mysql executable
-    --defaults-file <path>      Path to a custom .my.cnf
-    --server-log <path>         Path to explict log file
+## Connection and Authentication Options
 
-# PERFORMANCE AND REPORTING OPTIONS
+- **--host** _hostname_
 
-    --skipsize                  Don't enumerate tables and their types/sizes (default: on)
-                                (Recommended for servers with many tables)
-    --skippassword              Don't perform checks on user passwords(default: off)
-    --checkversion              Check for updates to MySQLTuner (default: don't check)
-    --updateversion             Check for updates to MySQLTuner and update when newer version is available (default: don't check)
-    --forcemem <size>           Amount of RAM installed in megabytes
-    --forceswap <size>          Amount of swap memory configured in megabytes
-    --passwordfile <path>       Path to a password file list(one password by line)
+    Connect to remote MySQL/MariaDB server via TCP/IP hostname or IP address.
 
-# OUTPUT OPTIONS
+- **--port** _port_
 
-    --silent                    Don't output anything on screen
-    --nogood                    Remove OK responses
-    --nobad                     Remove negative/suggestion responses
-    --noinfo                    Remove informational responses
-    --debug                     Print debug information
-    --noprocess                Consider no other process is running
-    --dbstat                    Print database information
-    --nodbstat                  Don't Print database information
-    --tbstat                    Print table information
-    --notbstat                  Don't Print table information
-    --colstat                   Print column information
-    --nocolstat                  Don't Print column information
-    --idxstat                   Print index information
-    --noidxstat                 Don't Print index information
-    --sysstat                   Print system information
-    --nosysstat                 Don't Print system information
-    --pfstat                    Print Performance schema
-    --nopfstat                  Don't Print Performance schema
-    --verbose                   Prints out all options (default: no verbose, dbstat, idxstat, sysstat, tbstat, pfstat)
-    --bannedports               Ports banned separated by comma(,)
-    --maxportallowed            Number of ports opened allowed on this hosts
-    --cvefile <path>            CVE File for vulnerability checks
-    --nocolor                   Don't print output in color
-    --json                      Print result as JSON string
-    --buffers                   Print global and per-thread buffer values
-    --outputfile <path>         Path to a output txt file
-    --reportfile <path>         Path to a report txt file
-    --template   <path>         Path to a template file
+    TCP/IP port number to connect to (default: 3306).
+
+- **--socket** _socket\_path_
+
+    Path to local UNIX domain socket for database communication.
+
+- **--user** _username_
+
+    Database username for authentication.
+
+- **--password** _password_, **--pass** _password_
+
+    Database password for authentication.
+
+- **--ask-pass**
+
+    Prompt interactively for database password on the terminal.
+
+- **--defaults-file** _path_
+
+    Path to a custom MySQL configuration file (e.g., `~/.my.cnf`).
+
+- **--defaults-extra-file** _path_
+
+    Path to an additional configuration file to read after standard defaults.
+
+- **--login-path** _path_
+
+    Read credentials from MySQL encrypted login path (via `mysql_config_editor`).
+
+- **--mysqlcmd** _path_
+
+    Path to custom `mysql` client binary.
+
+- **--mysqladmin** _path_
+
+    Path to custom `mysqladmin` binary.
+
+- **--tli**
+
+    Use Transport Layer Interface abstraction.
+
+- **--ssl-ca** _path_
+
+    Path to SSL Certificate Authority (CA) certificate.
+
+- **--caching-sha2-password**
+
+    Force caching\_sha2\_password authentication plugin mode.
+
+## Target Environment and Cloud Discovery Options
+
+- **--container** _container\_name\_or\_id_
+
+    Execute diagnostics inside a running Docker or Podman container.
+
+- **--ssh-host** _hostname_
+
+    Execute diagnostics over SSH remote transport.
+
+- **--ssh-user** _username_
+
+    SSH login username.
+
+- **--ssh-key** _path_
+
+    Path to SSH private key file.
+
+- **--ssh-port** _port_
+
+    SSH daemon port (default: 22).
+
+- **--aws-profile** _profile_
+
+    AWS CLI profile for Amazon RDS / Aurora cluster discovery.
+
+- **--aws-region** _region_
+
+    AWS Region for RDS / Aurora discovery.
+
+- **--aws-cluster-identifier** _id_
+
+    Amazon RDS / Aurora cluster identifier.
+
+- **--aws-instance-identifier** _id_
+
+    Amazon RDS instance identifier.
+
+- **--gcp-project** _project\_id_
+
+    Google Cloud project ID for Cloud SQL instances.
+
+- **--gcp-instance** _instance\_id_
+
+    Google Cloud SQL instance identifier.
+
+- **--azure-resource-group** _group_
+
+    Azure resource group for Azure Database for MySQL.
+
+- **--azure-server-name** _name_
+
+    Azure MySQL flexible/single server name.
+
+## Performance and Diagnostic Tuning Options
+
+- **--forcemem** _size_
+
+    Amount of physical RAM installed in host (e.g., `16G`, `1024M`, `128K`).
+
+- **--forceswap** _size_
+
+    Amount of configured swap space on host (e.g., `4G`, `2048M`).
+
+- **--skipworkload**
+
+    Bypass high-cardinality table churn and auto-increment exhaustion checks.
+
+- **--skippassword**
+
+    Skip offline dictionary checks for weak user passwords.
+
+- **--skipsize**
+
+    Skip table size enumeration queries on `information_schema`.
+
+- **--buffers**
+
+    Print detailed per-buffer memory allocations.
+
+- **--cvefile** _path_
+
+    Path to custom CVE vulnerabilities CSV database file.
+
+- **--passwordfile** _path_
+
+    Path to custom dictionary file for password audits.
+
+- **--checkversion**
+
+    Check for upstream MySQLTuner version updates.
+
+- **--nondedicated**
+
+    Adjust tuning formulas assuming the host runs non-database workloads.
+
+- **--noprocess**
+
+    Skip OS-level non-mysqld process enumeration.
+
+## Output and Export Options
+
+- **--verbose**, **-v**
+
+    Activate full verbose output including storage engines and table statistics.
+
+- **--silent**
+
+    Suppress standard console output.
+
+- **--outputfile** _path_
+
+    Save console report to plain text file.
+
+- **--reportfile** \[_path_\]
+
+    Generate interactive self-contained HTML diagnostic dashboard.
+
+- **--json**
+
+    Output raw diagnostic results as a JSON string.
+
+- **--prettyjson**
+
+    Output diagnostic results as formatted, indented JSON.
+
+- **--agent-json**
+
+    Output actionable AI remediation schema with SQL/config fixes and rollback statements.
+
+- **--yaml**
+
+    Output diagnostic metrics in YAML format.
+
+- **--dumpdir** _path_
+
+    Dump diagnostic data files and Markdown schema summaries to target directory.
+
+- **--schemadir** _path_
+
+    Export individual Markdown documentation files with Mermaid ER diagrams per schema.
+
+- **--nocolor**
+
+    Disable ANSI color codes in terminal output.
+
+- **--noprettyicon**
+
+    Use plain text markers (\[OK\], \[!!\], \[--\]) instead of Unicode icons.
+
+- **--stage-timings**
+
+    Display execution duration for each analysis stage.
+
+## Debugging and Filtering Options
+
+- **--debug**
+
+    Print internal debug traces and SQL query payloads.
+
+- **--dbgpattern** _regex_
+
+    Filter debug messages by regular expression pattern.
+
+- **--nobad**
+
+    Suppress negative findings and warning recommendations.
+
+- **--nogood**
+
+    Suppress positive / passing health checks.
+
+- **--noinfo**
+
+    Suppress informational messages.
+
+# VERSION
+
+Version 2.9.3
 
 # PERLDOC
 
-You can find documentation for this module with the perldoc command.
+You can inspect the embedded manual with the perldoc command:
 
-    perldoc mysqltuner
+    perldoc mysqltuner.pl
 
 ## INTERNALS
 
-[https://github.com/major/MySQLTuner-perl/blob/master/INTERNALS.md](https://github.com/major/MySQLTuner-perl/blob/master/INTERNALS.md)
+[https://github.com/jmrenouard/MySQLTuner-perl/blob/master/INTERNALS.md](https://github.com/jmrenouard/MySQLTuner-perl/blob/master/INTERNALS.md)
 
     Internal documentation
 
 # AUTHORS
 
 Major Hayden - major@mhtx.net
+Jean-Marie Renouard - jmrenouard@gmail.com
 
 # CONTRIBUTORS
 
@@ -113,33 +319,38 @@ Major Hayden - major@mhtx.net
 - Isart Montane
 - Baptiste M.
 - Cole Turner
-- Major Hayden
-- Joe Ashcraft
+- Daniel Lewart
+- Jason Gill
 - Jean-Marie Renouard
+- Major Hayden
+- Matthew Montgomery
 - Stephan GroBberndt
 - Christian Loos
+- Long Radix
+- derZ-dev
 
 # SUPPORT
 
 Bug reports, feature requests, and downloads at http://mysqltuner.pl/
 
-Bug tracker can be found at https://github.com/major/MySQLTuner-perl/issues
+Bug tracker can be found at https://github.com/jmrenouard/MySQLTuner-perl/issues
 
-Maintained by Major Hayden (major\\@mhtx.net) - Licensed under GPL
+Maintained by Jean-Marie Renouard (jmrenouard\\@gmail.com) - Licensed under GPL
 
 # SOURCE CODE
 
-[https://github.com/major/MySQLTuner-perl](https://github.com/major/MySQLTuner-perl)
+[https://github.com/jmrenouard/MySQLTuner-perl/](https://github.com/jmrenouard/MySQLTuner-perl/)
 
-    git clone https://github.com/major/MySQLTuner-perl.git
+    git clone https://github.com/jmrenouard/MySQLTuner-perl/.git
 
 # COPYRIGHT AND LICENSE
 
-Copyright (C) 2006-2022 Major Hayden - major@mhtx.net
+Copyright (C) 2006-2026 Major Hayden - major@mhtx.net
+\# Copyright (C) 2015-2026 Jean-Marie Renouard - jmrenouard@gmail.com
 
 For the latest updates, please visit http://mysqltuner.pl/
 
-Git repository available at https://github.com/major/MySQLTuner-perl
+Git repository available at https://github.com/jmrenouard/MySQLTuner-perl/
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

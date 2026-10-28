@@ -1,0 +1,24 @@
+# Version Support for MySQL
+
+> Official lifecycle data sourced dynamically from [endoflife.date/mysql](https://endoflife.date/mysql).
+> Regenerate via: `perl build/sync_eol_dates.pl --generate`
+
+| Version | End of Support Date | LTS | Status |
+|---------|------------------------|-----|--------|
+| 26.7 | N/A | NO | Supported |
+| 9.7 | 2034-04-30 | YES | Supported |
+| 9.6 | 2026-04-21 | NO | Outdated |
+| 9.5 | 2026-01-20 | NO | Outdated |
+| 9.4 | 2025-10-21 | NO | Outdated |
+| 9.3 | 2025-07-22 | NO | Outdated |
+| 9.2 | 2025-04-15 | NO | Outdated |
+| 9.1 | 2025-01-21 | NO | Outdated |
+| 9.0 | 2024-10-15 | NO | Outdated |
+| 8.4 | 2032-04-30 | YES | Supported |
+| 8.3 | 2024-04-30 | NO | Outdated |
+| 8.2 | 2024-01-16 | NO | Outdated |
+| 8.1 | 2023-10-25 | NO | Outdated |
+| 8.0 | 2026-04-30 | NO | Outdated |
+| 5.7 | 2023-10-31 | NO | Outdated |
+| 5.6 | 2021-02-28 | NO | Outdated |
+| 5.5 | 2018-12-31 | NO | Outdated |

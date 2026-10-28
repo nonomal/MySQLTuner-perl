@@ -1,417 +1,729 @@
 ## MySQLTuner Internals
 
+[!["Buy Us A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/jmrenouard)
+
 ## Table of contents
 
-* [MySQLTuner steps](#mysqltuner-steps)
-* [Get login information steps](#mysqltuner-get-login-information-steps)
-* [System checks](#mysqltuner-system-checks)
-* [Server version checks](#mysqltuner-server-version-checks)
-* [Error log file checks](#mysql-error-log-file-analysis)
-* [MySQL Storage engine general information](#mysql-storage-engine-general-information)
-* [Security checks](#mysqltuner-security-checks)
-* [CVE checks](#mysqltuner-cve-checks)
-* [Database information](#mysqltuner-database-information)
-* [Index information](#mysqltuner-index-information)
-* [Connections information](#mysqltuner-connections-information)
-* [Server information](#mysqltuner-server-information)
-* [Sort, join and temp table information](#mysqltuner-sort-join-and-temp-table-information)
-* [Global buffer information](#mysqltuner-global-buffer-information)
-* [Query cache checks](#mysqltuner-query-cache-checks)
-* [Slow queries checks](#mysqltuner-slow-queries-checks)
-* [ThreadPool information](#mysqltuner-threadpool-information)
-* [Replication checks](#mysqltuner-replication-checks)
-* [InnoDB information](#mysqltuner-innodb-information)
-* [MYISAM information](#mysqltuner-myisam-information)
-* [ARIADB information](#mysqltuner-ariadb-information)
-* [XTRADB information](#mysqltuner-xtradb-information)
-* [TOKUDB information](#mysqltuner-tokudb-information)
-* [ROCKDB information](#mysqltuner-rockdb-information)
-* [CONNECT information](#mysqltuner-connect-information)
-* [SPIDER information](#mysqltuner-spider-information)
-* [GALERA information](#mysqltuner-galera-information)
-* [Performance Schema information](#mysqltuner-performance-schema-and-sysschema-information)
+- [MySQLTuner Internals](#mysqltuner-internals)
+- [Table of contents](#table-of-contents)
+- [MySQLTuner steps](#mysqltuner-steps)
+- [MySQLTuner get login information steps](#mysqltuner-get-login-information-steps)
+- [MySQLTuner system checks](#mysqltuner-system-checks)
+- [MySQLTuner Server version checks](#mysqltuner-server-version-checks)
+- [Mysql error log file analysis](#mysql-error-log-file-analysis)
+- [MySQL Storage engine general information](#mysql-storage-engine-general-information)
+- [MySQLTuner security checks](#mysqltuner-security-checks)
+- [MySQLTuner SSL/TLS security checks](#mysqltuner-ssltls-security-checks)
+- [MySQLTuner authentication plugin auditing](#mysqltuner-authentication-plugin-auditing)
+- [MySQLTuner CVE vulnerabilities detection](#mysqltuner-cve-vulnerabilities-detection)
+- [MySQLTuner database information](#mysqltuner-database-information)
+- [MySQLTuner index information](#mysqltuner-index-information)
+- [MySQLTuner Connections information](#mysqltuner-connections-information)
+- [MySQLTuner server information](#mysqltuner-server-information)
+- [MySQLTuner sort, join and temp table information](#mysqltuner-sort-join-and-temp-table-information)
+- [MySQLTuner global buffer information](#mysqltuner-global-buffer-information)
+- [MySQLTuner query cache checks](#mysqltuner-query-cache-checks)
+- [MySQLTuner memory checks](#mysqltuner-memory-checks)
+- [MySQLTuner slow queries checks](#mysqltuner-slow-queries-checks)
+- [MySQLTuner replication checks](#mysqltuner-replication-checks)
+- [MySQLTuner InnoDB information](#mysqltuner-innodb-information)
+- [MySQLTuner AriaDB information](#mysqltuner-ariadb-information)
+- [MySQLTuner MyISAM information](#mysqltuner-myisam-information)
+- [MySQLTuner Galera information](#mysqltuner-galera-information)
+- [MySQLTuner TokuDB information](#mysqltuner-tokudb-information)
+- [MySQLTuner XtraDB information](#mysqltuner-xtradb-information)
+- [MySQLTuner Connect information](#mysqltuner-connect-information)
+- [MySQLTuner Spider information](#mysqltuner-spider-information)
+- [MySQLTuner RocksDb information](#mysqltuner-rocksdb-information)
+- [MySQLTuner Thread pool information](#mysqltuner-thread-pool-information)
+- [MySQLTuner performance schema and sysschema information](#mysqltuner-performance-schema-and-sysschema-information)
+- [MySQLTuner Table Structure Analysis](#mysqltuner-table-structure-analysis)
+- [MySQLTuner Naming Conventions Analysis](#mysqltuner-naming-conventions-analysis)
+- [MySQLTuner Foreign Key Analysis](#mysqltuner-foreign-key-analysis)
+- [MySQLTuner MySQL 8.0+ / MariaDB Modeling Checks](#mysqltuner-mysql-80--mariadb-modeling-checks)
+- [MySQLTuner Data Type Optimization](#mysqltuner-data-type-optimization)
+- [MySQLTuner Schema Sanitization](#mysqltuner-schema-sanitization)
+- [MySQLTuner Cloud and SSH integration](#mysqltuner-cloud-and-ssh-integration)
+- [MySQLTuner Cloud Autodiscovery](#mysqltuner-cloud-autodiscovery)
+- [MySQLTuner Infrastructure Awareness](#mysqltuner-infrastructure-awareness)
+- [MySQLTuner Container and Systemd log integration](#mysqltuner-container-and-systemd-log-integration)
+- [MySQLTuner Weighted Health Score](#mysqltuner-weighted-health-score)
+- [MySQLTuner Predictive Capacity Analysis](#mysqltuner-predictive-capacity-analysis)
+- [MySQLTuner Guided Auto-Fix Engine](#mysqltuner-guided-auto-fix-engine)
+- [MySQLTuner Query Anti-Pattern Detection](#mysqltuner-query-anti-pattern-detection)
+- [MySQLTuner Sysbench Integration](#mysqltuner-sysbench-integration)
+- [MySQLTuner Historical Trend Analysis](#mysqltuner-historical-trend-analysis)
+- [MySQLTuner Aborted Connections Management](#mysqltuner-aborted-connections-management)
+- [MySQLTuner AI Agent Remediation & MCP Server Architecture](#mysqltuner-ai-agent-remediation--mcp-server-architecture)
+- [MySQLTuner Workload Profiling & Auto-Increment Optimization](#mysqltuner-workload-profiling--auto-increment-optimization)
+- [MySQLTuner Enhanced Galera Cluster & Group Replication](#mysqltuner-enhanced-galera-cluster--group-replication)
 
 ## MySQLTuner steps
 
-* Header Print
-* Get login information
-* Set up some OS variables
-* Toss variables/status into hashes
-* Get information about the tuning connexion
-* Check current MySQL version
-* Suggest 64-bit upgrade
-* Analyze mysqld error log file
-* Show enabled storage engines
-* Show informations about databases (option: --dbstat)
-* Show informations about indexes (option: --idxstat)
-* Display some security recommendations
-* Calculate everything we need
-* Print the server stats
-* Print MyISAM stats
-* Print InnoDB stats
-* Print AriaDB stats
-* Print replication info
-* Make recommendations based on stats
-* Close reportfile if needed
-* Dump result if debug is on
+- Header Print
+- Validate MySQLTuner version (check for updates)
+- Setup Cloud mode (Azure/AWS) and SSH if needed
+- Setup OS variables and commands (SSH prefixing)
+- Get login information and setup MySQL connection
+- Toss variables/status into hashes
+- Validate MySQL and MariaDB versions (EOL check)
+- Suggest 64-bit upgrade and architecture check
+- Analyze mysqld error log file (Local, Docker, Podman, Kubectl, Systemd)
+- Detect Cloud Environment (AWS, GCP, Azure, DigitalOcean)
+- Detect Infrastructure (Storage type, Hardware architecture)
+- Show parameters impacting performance during analysis
+- Show information about databases (option: --dbstat)
+- Show information about tables (option: --tbstat)
+- Show information about columns (option: --colstat)
+- Show information about indexes (option: --idxstat)
+- Show information about views, triggers, and routines
+- Show information about plugins (option: --plugininfo)
+- Show enabled storage engines
+- Display security recommendations
+- Display SSL/TLS security audit
+- Display authentication plugin audit
+- CVE vulnerabilities detection
+- Calculate everything we need
+- Print the server stats
+- Print MyISAM stats
+- Print InnoDB stats
+- Print AriaDB stats
+- Print Galera cluster stats
+- Print replication info (Source/Replica, GTID, Semi-sync)
+- Query Anti-Pattern Detection (Performance Schema digests)
+- Print Storage Engine specific stats (TokuDB, RocksDB, Spider, etc.)
+- Print Performance Schema stats
+- Table structure analysis (option: --structstat)
+- Naming conventions analysis (option: --structstat)
+- Foreign key analysis (option: --structstat)
+- MySQL 8.0+ / MariaDB modeling checks (option: --structstat)
+- Data type optimization analysis (option: --structstat)
+- Schema sanitization checks (option: --structstat)
+- Weighted Health Score KPI calculation and display
+- Predictive Capacity Analysis (memory headroom, disk growth)
+- Sysbench result analysis (if provided via --sysbench-file)
+- Historical Trend Analysis (if comparison file provided via --compare-file)
+- Guided Auto-Fix Snippets generation
+- Make recommendations based on stats
+- Close reportfile if needed
+- Dump result if debug is on
 
 ## MySQLTuner get login information steps
 
-* Is a login possible?
-    * Force socket?
-    * Remote connection?
-        * _Specifying available RAM is required_
-    * Got user/pass on command line?
-    * mysql-quickbackup credentials available?
-    * Plesk credentials available?
-    * DirectAdmin credentials available?
-    * Debian maintenance account credentials available?
-    * Just try a login
-        * If working, and .my.cnf isn't there, **WARNING**
-        * If working, and .my.cnf is there, okay
-    * Prompt for creds on the console
+- Is a login possible?
+  - Cloud setup (Azure/AWS)?
+  - SSH prefixing?
+  - Force socket, pipe, or specific protocol?
+  - Remote connection?
+    - _Specifying available RAM/Swap is required_
+    - _Automatic detection if SSH is used_
+  - SSL CA certificate?
+  - Got user/pass on command line?
+  - mysql-quickbackup credentials available?
+  - Plesk credentials available?
+  - DirectAdmin credentials available?
+  - Debian maintenance account credentials available?
+  - Defaults file or defaults extra file?
+  - Just try a login
+    - If working, and .my.cnf isn't there, **WARNING**
+    - If working, and .my.cnf is there, okay
+  - Prompt for creds on the console
+- On login failure:
+  - Print the real client error (`Client error: ERROR nnnn ...`) with a TLS hint (2026/SSL) or network hint (2002-2005)
+  - Report "invalid credentials" only for authentication errors (1045/1698)
+  - Explicit `--pass` / `--login-path` credentials: report once and exit 1 (no fallback to other methods)
 
 ## MySQLTuner system checks
-* 32-bit w/>2GB RAM check
-* Check number of opened ports (warning if more than 9 ports opened)
-* Check 80, 8080, 443 and 8443 ports if warning are raised if there are opened
-* Check if some banned ports are not opened (option --bannedports separated by comma)
-* Check if non kernel and user process except mysqld are not using more than 15% of total physical memory)
-* Check vm.swapiness
-* Check /etc/security/limit.conf
-* Check sysctl entries: sunrpc.tcp_slot_entries, vm.swappiness, fs.aio-fs-nr
-* Check mount point
-* Check Ethernet card
-* Check load average
+
+- Check whether more than 2GB RAM present if on 32-bit OS
+
+- Check number of opened ports (warn when more than 9 ports opened)
+- Check 80, 8080, 443 and 8443 ports if warning is raised if they are opened
+- Check if some banned ports are not opened (option --bannedports separated by comma)
+- Check if non kernel and user process except mysqld are not using more than 15% of total physical memory
+- Check vm.swapiness
+- Check /etc/security/limit.conf
+- Check sysctl entries: sunrpc.tcp_slot_entries, vm.swappiness, fs.aio-fs-nr
+- Check mount point
+- Check Ethernet card
+- Check load average
 
 ## MySQLTuner Server version checks
-* EOL MySQL version check
-* Currently MySQL < 5.1 are EOF considered.
-* Using 5.5+ version of MySQL for performance issue (asynchronous IO).
+
+- EOL MySQL and MariaDB version check
+- Currently MySQL < 5.5 and MariaDB < 10.6 are considered EOL
+- Using 5.5+ version of MySQL for performance issue (asynchronous IO)
+- MySQL 9.x readiness: detection of removed variables and eliminated authentication methods
+- Supported versions are labelled `(LTS)` or `(short-term support)`; cycles come from `build/ci_matrix.json` (`lts`, `legacy_supported`, `short_term`) via `build/sync_supported_versions.pl`
+- MariaDB deprecated aliases (`tx_isolation` >= 11.1, `innodb_prefix_index_cluster_optimization` >= 10.10) are reported only when explicitly configured (`information_schema.SYSTEM_VARIABLES.GLOBAL_VALUE_ORIGIN` = CONFIG, COMMAND-LINE or SQL)
 
 ## Mysql error log file analysis
-* Look for potential current error log file name
-* Check permission on error log file
-* Check size on error log file
-* Check error and warning on error log file
-* Find last start and shutdown on error log file
+
+- Look for potential current error log file name
+
+- Automatic detection for:
+  - Docker containers
+  - Podman containers
+  - Kubectl/Kubernetes pods
+  - Systemd journal (journalctl)
+- Check permission on error log file
+- Check size on error log file (warning if > 32MB)
+- Check error and warning on error log file
+- Find last start and shutdown on error log file
 
 ## MySQL Storage engine general information
 
-* Get storage engine counts/stats
-    * Check for DB engines that are enabled but unused
-    * Look for fragmented tables
-    * Look for auto-increments near capacity
-    	* Look for table with autoincrement with value near max capacity
+- Get storage engine counts/stats
+  - Check for DB engines that are enabled but unused
+  - Look for fragmented tables
+  - Look for auto-increments near capacity
+    - Look for tables with auto-increment with value near max capacity
 
 ## MySQLTuner security checks
 
-* Is anonymous user present?
-* Users without passwords
-* Users w/username as password
-* Users w/o host restriction
-* Weak password check (possibly using cracklib later?)
-* Using basic_passwords.txt as password database
-* Password list checks can be avoid (option: --skippassword)
+- Is anonymous user present?
+- Users without passwords
+- Users with username as password
+- Users without host restriction
+- Weak password check (possibly using cracklib later?)
+- Using basic_passwords.txt as password database
+- Password list checks can be avoided (option: --skippassword)
+- Max password checks configurable (option: --max-password-checks, default: 100)
+
+## MySQLTuner SSL/TLS security checks
+
+- Current session encryption status (Ssl_cipher check)
+- Global SSL support (have_ssl variable, then session `Ssl_cipher`, then `performance_schema.tls_channel_status` on MySQL 8.0.21+ since `have_ssl` was removed in MySQL 8.4)
+- `require_secure_transport` enforcement (MySQL 5.7+, MariaDB 10.5+)
+- TLS version audit:
+  - Warn if TLSv1.0 or TLSv1.1 are enabled (insecure)
+  - Verify TLSv1.2 or TLSv1.3 are available
+- SSL certificate presence and local audit:
+  - Certificate file existence and permissions
+  - Certificate expiration date check
+- Remote user SSL enforcement:
+  - Check if remote users (`%` host) require SSL
+- CSV export of SSL issues (with --dumpdir)
+
+## MySQLTuner authentication plugin auditing
+
+- Detection of insecure authentication plugins:
+  - `mysql_native_password` (SHA-1 based, deprecated in MySQL 8.0+)
+  - `mysql_old_password` (legacy, insecure)
+  - `sha256_password` (deprecated in favor of `caching_sha2_password`)
+- MySQL 9.x readiness diagnostics:
+  - Eliminated authentication methods detection
+  - Migration path recommendations
+- MariaDB-specific recommendations:
+  - Suggest `ed25519` for modern password authentication
+  - Suggest `unix_socket` for local root authentication
+- Extended plugins support matrix (see [AUTHENTICATION_PLUGINS.md](documentation/AUTHENTICATION_PLUGINS.md))
 
 ## MySQLTuner CVE vulnerabilities detection
 
-* option: --cvefile
-* Check if your MariaDB or MySQL version contains CVE bulletins.
+- option: --cvefile
+- Check if your MariaDB or MySQL version contains CVE entries.
 
 ## MySQLTuner database information
-* Performance analysis parameter checks
-* Per database information
-        * Tables number
-	* Rows number
-	* Total size
-	* Data size
-	* Percentage of data size
-	* Index size
-	* Percentage of index size
-        * Collation number
-        * Check that there is only one collation for all table in a database
-        * Check that there is only one collation for ll table columns in a database
-        * Check that there is only one storage engine per user database
 
+- Performance analysis parameter checks (metadata performance)
+
+- Per database information
+        * Tables number
+  - Rows number
+  - Total size
+  - Data size
+  - Percentage of data size
+  - Index size
+  - Percentage of index size
+  - Views number
+  - Triggers number
+  - Routines number
+  - Collation number
+  - Check that there is only one collation for all tables in database
+  - Check that there is only one collation for all table columns in database
+  - Check that there is only one storage engine per user database
 
 ## MySQLTuner index information
 
-* Top 10 worth selectivity index
-* Per index information
-	* Index Cardinality
-	* Index Selectivity
-	* Misc information about index definition
-	* Misc information about index size
+- Top 10 worth selectivity index
+- Per index information
+  - Index Cardinality
+  - Index Selectivity
+  - Misc information about index definition
+  - Misc information about index size
 
 ## MySQLTuner Connections information
 
-* Highest usage of available connections
-* Percentage of used connections (<85%)
-* Percentage of aborted connections (<3%)
+- Highest usage of available connections
+- Percentage of used connections (<85%)
+- Percentage of aborted connections (<3%)
 
 ## MySQLTuner server information
 
-* Uptime: If MySQL started within last 24 hours
-* Bytes received and sent
-* Number of connections
-* Percentage between reads and writes
-* Is binary log activated ?
-   * Is GTID mode activated ?
+- Uptime: whether MySQL started within last 24 hours
+- Bytes received and sent
+- Number of connections
+- Percentage between reads and writes
+- Is binary log activated?
+  - Is GTID mode activated?
 
 ## MySQLTuner sort, join and temp table information
-* Max memory temporary table size allowed.
-* Percentage of sort using temporary table (<10%)
-* Number of join performed without using indexes (<250)
-* Percentage of temporary table written on disk(<25%)
-* Thread cache (=4)
-* Thread cache hit ratio (>50%) if thread_handling is different of pools-of-threads
-* Table cache hit ratio(>2°%)
-* Table cache definition should be upper that total number of tables or in autoresizing mode
-* Percentage of open file and open file limit(<85%)
-* Percentage of table locks (<95%)
-* Percentage of binlog cache lock (<90%)
+
+- Max memory temporary table size allowed.
+- Percentage of sort using temporary table (<10%)
+- Number of join performed without using indexes (<250)
+- Percentage of temporary table written on disk (<25%)
+- Thread cache (=4)
+- Thread cache hit ratio (>50%) if thread_handling is different of pools-of-threads
+- Table cache hit ratio (>2°%)
+- Table cache definition should be upper that total number of tables or in autoresizing mode
+- Percentage of open file and open file limit (<85%)
+- Percentage of table locks (<95%)
+- Percentage of binlog cache lock (<90%)
 
 ## MySQLTuner global buffer information
 
-* Key Buffer
-* Max Tmp Table
-* Per Thread Buffer
-   * Read Buffer
-   * Read RND Buffer
-	* Sort Buffer
-	* Thread stack
-	* Join Buffer
-	* Binlog Cache Buffers size if activated
+- Key Buffer
+- Max Tmp Table
+- Per Thread Buffer
+  - Read Buffer
+  - Read RND Buffer
+  - Sort Buffer
+  - Thread stack
+  - Join Buffer
+  - Binlog Cache Buffers size if activated
 
 ## MySQLTuner query cache checks
 
-* Is Query cache activated ?
-   * Query Cache Buffers
-   * Query Cache DISABLED, ALL REQUEST or ON DEMAND
-   * Query Cache Size
-   * Query cache hit ratio (cache efficiency)
+- Is Query cache activated?
+  - Query Cache Buffers
+  - Query Cache DISABLED, ALL REQUEST or ON DEMAND
+  - Query Cache Size
+  - Query cache hit ratio (cache efficiency)
 
 ## MySQLTuner memory checks
 
-* Get total RAM/swap
-* Is there enough memory for max connections reached by MySQL ?
-* Is there enough memory for max connections allowed by MySQL ?
-* Max percentage of memory used(<85%)
+- Get total RAM/swap
+- Is there enough memory for max connections reached by MySQL?
+- Is there enough memory for max connections allowed by MySQL?
+- Max percentage of memory used (<85%)
 
 ## MySQLTuner slow queries checks
 
-* Percentage of Slow queries  (<5%)
+- Percentage of Slow queries (<5%)
 
 ## MySQLTuner replication checks
 
-* Is server replication configured as slave ?
-* SQL replication thread running ?
-* IO replication thread running ?
-* Replication lag in seconds (Seconds_behind_master)
-* Is Slave configured in read only ?
-* replication type ROW, MIX, STMT
-* replication Semisync master
-* replication Semisync slave
-* XA support activated
-* replication started ?
+- Is server replication configured as replica?
+- SQL replication thread running?
+- IO replication thread running?
+- Replication lag in seconds (Seconds_behind_replica)
+- Is Replica configured in read only?
+- Replication type ROW, MIX, STMT
+- Replication Semisync source
+- Replication Semisync replica
+- XA support activated
+- Replication started?
 
 ## MySQLTuner InnoDB information
 
-* InnoDB Buffer Pool Size
-   * If possible, innodb_buffer_pool_size should be greater data and index size for Innodb Table
-   * Innodb_buffer_pool_size should around 75 to 80 % of the available system memory.
-* InnoDB Buffer Pool Instances
-   * MySQL needs 1 instance per 1Go of Buffer Pool
-   * innodb_buffer_pool instances = round(innodb_buffer_pool_size / 1Go)
-   * innodb_buffer_pool instances must be equals or lower than 64
+- InnoDB Buffer Pool Size
+  - If possible, innodb_buffer_pool_size should be greater than data and index size for Innodb Table
+  - Innodb_buffer_pool_size should be around 75% to 80% of the available system memory.
+- InnoDB Buffer Pool Instances
+  - MySQL needs 1 instance per 1Go of Buffer Pool
+  - innodb_buffer_pool instances = round(innodb_buffer_pool_size / 1Go)
+  - innodb_buffer_pool instances must be equal to or lower than 64
 
-   - A bug in MySQL 5.6 causes SHOW VARIABLES to report an innodb_buffer_pool_instances value of 8 when innodb_buffer_pool_size is less than 1GB and only one buffer pool instance is present (Bug #18343670).
+  - A bug in MySQL 5.6 causes SHOW VARIABLES to report an innodb_buffer_pool_instances value of 8 when innodb_buffer_pool_size is less than 1GB and only one buffer pool instance is present (Bug #18343670).
 
-* InnoDB Buffer Pool Usage
-   * If more than 20% of InnoDB buffer pool is not used, MySQLTuner raise an alert.
-* InnoDB Buffer Pool Log Size
-   * InnoDB total log file size should be 25% of innodb_buffer_pool_size
-* InnoDB Read efficiency
-   * Ratio of read without locks
-* InnoDB Write efficiency
-   * Ratio of write without locks
-* InnoDB Log Waits
-   * Checks that no lock is used on Innodb Log.
-* InnoDB Chunk Size
-   * Check InnoDB Buffer Pool size is a multiple of InnoDB Buffer Pool chunk size * InnoDB Buffer Pool instances
+- InnoDB Buffer Pool Usage
+  - If more than 20% of InnoDB buffer pool is not used, raise an alert.
+- InnoDB Buffer Pool Log Size
+  - InnoDB total log file size should be 25% of innodb_buffer_pool_size
+- InnoDB Read efficiency
+  - Ratio of read without locks
+- InnoDB Write efficiency
+  - Ratio of write without locks
+- InnoDB Log Waits
+  - Checks that no lock is used on Innodb Log.
+- InnoDB Chunk Size
+  - Check InnoDB Buffer Pool size is a multiple of InnoDB Buffer Pool chunk size * InnoDB Buffer Pool instances
 
-## MySQLTuner ARIADB information
+## MySQLTuner AriaDB information
 
-* Is Aria indexes size is greater than page cache size ?
-* Page cache read hit ratio (>95%)
-* Page cache write hit ratio (>95%)
+- Is Aria indexes size greater than page cache size?
+- Page cache read hit ratio (>95%)
+- Page cache write hit ratio (>95%)
 
+## MySQLTuner MyISAM information
 
-## MySQLTuner MYISAM information
-
-* Key buffer usage (>90%)
-* Is MyISAM indexes size is greater than key buffer size ?
-* Key buffer read hit ratio (>95%)
-* Key buffer write hit ratio (>95%)
+- Key buffer usage (>90%)
+- Is MyISAM indexes size is greater than key buffer size ?
+- Key buffer read hit ratio (>95%)
+- Key buffer write hit ratio (>95%)
 
 ## MySQLTuner Galera information
-* wsrep_ready cluster is ready
-* wsrep_connected node is connected to other nodes
-* wsrep_cluster_name is defined.
-* wsrep_node_name is defined.
-* Check thet notification script wsrep_notify_cmd is defined
-* wsrep_cluster_status PRIMARY /NON PRIMARY.
-	* PRIMARY : Coherent cluster
-	* NO PRIMARY : cluster gets several states
-* wsrep_ local_state_comment: Node state
-	* SYNCED (uptodate),
-	* DONOR(sending information to another node)
-	* Joiner(Try to reach cluster group)
-	* SYNCED state able to read/write
-* wsrep_cluster_conf_id configuration level must be identical in all nodes
-* wsrep_slave_thread is between 3 or 4 times number of CPU core.
-* gcs.limit should be equal to wsrep_slave_threads * 5
-* gcs.fc_factor should be equal to 0.8
-* Flow control fraction should be lower than 0.02 (wsrep_flow_control_paused < 0.02)
-* wsrep_last_commited committed level must be identical in all nodes
-* Look for tables without primary keys
-* Look for non InnoDB tables for Galera
-* Variable innodb_flush_log_at_trx_commit should be set to 0.
-* Check that there is 3 or 5 members in Galera cluster.
-* Check that xtrabackup is used for SST method with wsrep_sst_method variable.
-* Check variables wsrep_OSU_method is defined to TOI for updates.
-* Check that there is no certification failures controlling wsrep_local_cert_failures status.
+
+- wsrep_ready cluster is ready
+- wsrep_connected node is connected to other nodes
+- wsrep_cluster_name is defined.
+- wsrep_node_name is defined.
+- Check thet notification script wsrep_notify_cmd is defined
+- wsrep_cluster_status PRIMARY /NON PRIMARY.
+  - PRIMARY : Coherent cluster
+  - NO PRIMARY : cluster gets several states
+- wsrep_local_state_comment: Node state
+  - SYNCED (uptodate),
+  - DONOR (sending information to another node)
+  - Joiner (try to reach cluster group)
+  - SYNCED state able to read/write
+- wsrep_cluster_conf_id configuration level must be identical in all nodes
+- wsrep_slave_thread is between 3 or 4 times number of CPU core.
+- gcs.limit should be equal to wsrep_slave_threads * 5
+- gcs.fc_factor should be equal to 0.8
+- Flow control fraction should be lower than 0.02 (wsrep_flow_control_paused < 0.02)
+- wsrep_last_commited committed level must be identical in all nodes
+- Look for tables without primary keys
+- Look for non InnoDB tables for Galera
+- Variable innodb_flush_log_at_trx_commit should be set to 0.
+- Check that there are 3 or 5 members in Galera cluster.
+- Check that xtrabackup is used for SST method with wsrep_sst_method variable.
+- Check variables wsrep_OSU_method is defined to TOI for updates.
+- Check that there is no certification failures controlling wsrep_local_cert_failures status.
 
 ## MySQLTuner TokuDB information
 
-* tokudb_cache_size
-* tokudb_directio
-* tokudb_empty_scan
-* tokudb_read_block_size
-* tokudb_commit_sync
-* tokudb_checkpointing_period
-* tokudb_block_size
-* tokudb_cleaner_iterations
-* tokudb_fanout
+- tokudb_cache_size
+- tokudb_directio
+- tokudb_empty_scan
+- tokudb_read_block_size
+- tokudb_commit_sync
+- tokudb_checkpointing_period
+- tokudb_block_size
+- tokudb_cleaner_iterations
+- tokudb_fanout
 
 ## MySQLTuner XtraDB information
 
-*  Nothing for the moment
+- wsrep_node_name
+- wsrep_cluster_name
+- wsrep_cluster_address
 
 ## MySQLTuner Connect information
 
-*  Nothing for the moment
+- connect_type
+- connect_user
+- connect_host
 
 ## MySQLTuner Spider information
 
-*  Nothing for the moment
+- spider_nodes
+- spider_direct_io
 
 ## MySQLTuner RocksDb information
 
-*  Nothing for the moment
+- rocksdb_block_cache_size
+- rocksdb_max_open_files
 
 ## MySQLTuner Thread pool information
 
-* thread_pool_size between 16 to 36 for Innodb usage
-* thread_pool_size between 4 to 8 for MyIsam usage
+- thread_pool_size between 16 to 36 for Innodb usage
+- thread_pool_size between 4 to 8 for MyISAM usage
 
 ## MySQLTuner performance schema and sysschema information
-* Check that Performance schema is activated for 5.6+ version
-* Check that Performance schema is deactivated for 5.5- version
-* Check that Sys schema is installed
-* sys Schema version
-* Top user per connection
-* Top user per statement
-* Top user per statement latency
-* Top user per lock latency
-* Top user per full scans
-* Top user per row_sent
-* Top user per row modified
-* Top user per io
-* Top user per io latency
-* Top host per connection
-* Top host per statement
-* Top host per statement latency
-* Top host per lock latency
-* Top host per full scans
-* Top host per rows sent
-* Top host per rows modified
-* Top host per io
-* Top 5 host per io latency
-* Top IO type order by total io
-* Top IO type order by total latency
-* Top IO type order by max latency
-* Top Stages order by total io
-* Top Stages order by total latency
-* Top Stages order by avg latency
-* Top host per table scans
-* InnoDB Buffer Pool by schema
-* InnoDB Buffer Pool by table
-* Process per allocated memory
-* InnoDB Lock Waits
-* Threads IO Latency
-* High Cost SQL statements
-* Top 5% slower queries
-* Top 10 nb statement type
-* Top statement by total latency
-* Top statement by lock latency
-* Top statement by full scans
-* Top statement by rows sent
-* Top statement by rows modified
-* Use temporary tables
-* Unused Indexes
-* Full table scans
-* Latest file IO by latency
-* File by IO read bytes
-* File by IO written bytes
-* File per IO total latency
-* File per IO read latency
-* File per IO write latency
-* Event Wait by read bytes
-* Event Wait by write bytes
-* Event per wait total latency
-* Event per wait read latency
-* Event per wait write latency
-* TOP 15 most read indexes
-* TOP 15 most modified indexes
-* TOP 15 high select latency index
-* TOP 15 high insert latency index
-* TOP 15 high update latency index
-* TOP 15 high delete latency index
-* TOP 15 most read tables
-* TOP 15 most modified tables
-* TOP 15 high select latency tables
-* TOP 15 high insert latency tables
-* TOP 15 high update latency tables
-* TOP 15 high delete latency tables
-* Redundant indexes
-* Tables not using InnoDb buffer
-* Top 15 Tables using InnoDb buffer
-* Top 15 Tables with InnoDb buffer free
-* Top 15 Most executed queries
-* Latest SQL queries in errors or warnings
-* Top 20 queries with full table scans
-* TOP 15 reader queries (95% percentile)
-* TOP 15 row look queries (95% percentile)
-* TOP 15 total latency queries (95% percentile)
-* TOP 15 max latency queries (95% percentile)
-* TOP 15 average latency queries (95% percentile)
-* Top 20 queries with sort
-* Last 50 queries with sort
-* TOP 15 row sorting queries with sort
-* TOP 15 total latency queries with sort
-* TOP 15 merge queries with sort
-* TOP 15 average sort merges queries with sort
-* TOP 15 scans queries with sort
-* TOP 15 range queries with sort
-* Top 20 queries with temp table
-* Last 50 queries with temp table
-* TOP 15 total latency queries with temp table
-* TOP 15 queries with temp table to disk
-* TOP 15 class events by number
-* TOP 30 events by number
-* TOP 15 class events by total latency
-* TOP 30 events by total latency
-* TOP 15 class events by max latency
-* TOP 30 events by max latency
+
+- Check that Performance schema is activated for 5.6+ version
+- Check that Performance schema is deactivated for 5.5- version
+- Check that Sys schema is installed
+- Sys Schema version
+- Top user per connection
+- Top user per statement
+- Top user per statement latency
+- Top user per lock latency
+- Top user per full scans
+- Top user per row_sent
+- Top user per row modified
+- Top user per io
+- Top user per io latency
+- Top host per connection
+- Top host per statement
+- Top host per statement latency
+- Top host per lock latency
+- Top host per full scans
+- Top host per rows sent
+- Top host per rows modified
+- Top host per io
+- Top 5 host per io latency
+- Top IO type order by total io
+- Top IO type order by total latency
+- Top IO type order by max latency
+- Top Stages order by total io
+- Top Stages order by total latency
+- Top Stages order by avg latency
+- Top host per table scans
+- InnoDB Buffer Pool by schema
+- InnoDB Buffer Pool by table
+- Process per allocated memory
+- InnoDB Lock Waits
+- Threads IO Latency
+- High Cost SQL statements
+- Top 5% slower queries
+- Top 10 nb statement type
+- Top statement by total latency
+- Top statement by lock latency
+- Top statement by full scans
+- Top statement by rows sent
+- Top statement by rows modified
+- Use temporary tables
+- Unused Indexes
+- Full table scans
+- Latest file IO by latency
+- File by IO read bytes
+- File by IO written bytes
+- File per IO total latency
+- File per IO read latency
+- File per IO write latency
+- Event Wait by read bytes
+- Event Wait by write bytes
+- Event per wait total latency
+- Event per wait read latency
+- Event per wait write latency
+- Top 15 most read indexes
+- Top 15 most modified indexes
+- Top 15 high select latency index
+- Top 15 high insert latency index
+- Top 15 high update latency index
+- Top 15 high delete latency index
+- Top 15 most read tables
+- Top 15 most modified tables
+- Top 15 high select latency tables
+- Top 15 high insert latency tables
+- Top 15 high update latency tables
+- Top 15 high delete latency tables
+- Redundant indexes
+- Tables not using InnoDb buffer
+- Top 15 Tables using InnoDb buffer
+- Top 15 Tables with InnoDb buffer free
+- Top 15 Most executed queries
+- Latest SQL queries in errors or warnings
+- Top 20 queries with full table scans
+- Top 15 reader queries (95% percentile)
+- Top 15 row look queries (95% percentile)
+- Top 15 total latency queries (95% percentile)
+- Top 15 max latency queries (95% percentile)
+- Top 15 average latency queries (95% percentile)
+- Top 20 queries with sort
+- Last 50 queries with sort
+- Top 15 row sorting queries with sort
+- Top 15 total latency queries with sort
+- Top 15 merge queries with sort
+- Top 15 average sort merges queries with sort
+- Top 15 scans queries with sort
+- Top 15 range queries with sort
+- Top 20 queries with temp table
+- Last 50 queries with temp table
+- Top 15 total latency queries with temp table
+- Top 15 queries with temp table to disk
+- Top 15 class events by number
+- Top 30 events by number
+- Top 15 class events by total latency
+- Top 30 events by total latency
+- Top 15 class events by max latency
+- Top 30 events by max latency
+
+## MySQLTuner Cloud and SSH integration
+
+- **Cloud mode**: Activated with `--cloud` or `--azure`.
+- **SSH Support**: Allows running system commands on a remote host via SSH.
+- **SSH Authentication**: Supports identity files (`--ssh-identity-file`) and passwords (`--ssh-password` using `sshpass`).
+- **Remote Resource Detection**: Automatically detects RAM and Swap on the remote host if SSH is used.
+
+## MySQLTuner Container and Systemd log integration
+
+- **Docker/Podman**: Automatically detects logs from the most relevant database container based on ports and names.
+- **Kubectl**: Supports retrieving logs from Kubernetes pods.
+- **Systemd**: Supports retrieving logs from the systemd journal using `journalctl`.
+- **Explicit Container**: Can be specified using `--container <type>:<name>`.
+
+## MySQLTuner Infrastructure Awareness
+ 
+- **Storage Type**: Detects SSD/NVMe vs HDD by checking /sys/block/*/queue/rotational.
+- **Hardware Architecture**: Detects ARM64/Graviton vs x86_64.
+- **Tuning Adjustments**: Suggestions for innodb_flush_neighbors and innodb_io_capacity based on storage type.
+ 
+## MySQLTuner Cloud Autodiscovery
+ 
+- **AWS**: Detects RDS/Aurora via @@version_comment and @@aurora_version.
+- **GCP**: Detects Cloud SQL via @@version_comment and @@cloudsql_instance_id.
+- **Azure**: Detects Flexible Server via @@version_comment.
+- **DigitalOcean**: Detects Managed MySQL via @@version_comment.
+ 
+## MySQLTuner Query Anti-Pattern Detection
+ 
+- **Full Scans**: Analyzes events_statements_summary_by_digest for queries with high no_index_used or no_good_index_used.
+- **Disk Temp Tables**: Identifies queries creating excessive internal disk-based temporary tables.
+ 
+## MySQLTuner Sysbench Integration
+ 
+- **Metrics**: Parses sysbench output for QPS, TPS, and latency (Avg/95th/Max).
+- **Comparison**: Includes baseline performance metrics in the final report.
+ 
+## MySQLTuner Historical Trend Analysis
+ 
+- **JSON Snapshots**: Ingests JSON output from previous runs via --compare-file.
+- **Comparisons**: Provides trends for QPS and Data Growth between snapshots.
+
+## MySQLTuner Table Structure Analysis
+
+Activated with `--structstat` or `--verbose`.
+
+- Tables without primary keys detection
+- Primary Key naming convention checks:
+  - Expected: `id` or `<table_name>_id`
+  - Deviations flagged and counted
+- Surrogate key type validation:
+  - Recommended: `BIGINT UNSIGNED AUTO_INCREMENT`
+  - UUID optimization: recommend `BINARY(16)` instead of `VARCHAR`
+- Large tables (>1GB) without secondary indexes
+- Foreign Key data type mismatches between referencing and referenced columns
+- Non-InnoDB tables detection (recommend migration to InnoDB)
+- Non-UTF8 columns detection (character set and collation audit)
+- FULLTEXT columns inventory
+- CSV export of findings (with --dumpdir):
+  - `tables_without_primary_keys.csv`
+  - `primary_key_issues.csv`
+  - `tables_non_innodb.csv`
+  - `columns_non_utf8.csv`
+  - `columns_utf8.csv`
+  - `fulltext_columns.csv`
+
+## MySQLTuner Naming Conventions Analysis
+
+Activated with `--structstat` or `--verbose`.
+
+- Automatic dominant style detection across the codebase:
+  - Supported styles: `snake_case`, `camelCase`, `PascalCase`, `kebab-case`, `UPPER_SNAKE_CASE`
+- Table naming checks:
+  - Plural name detection (prefer singular table names)
+  - Casing consistency vs dominant style
+- View naming consistency checks
+- Index naming consistency checks
+- Column naming checks:
+  - Casing consistency vs dominant style
+  - Boolean column prefix convention (`is_`, `has_`, `was_`, `had_`)
+  - Date/Time column suffix convention (`_at`, `_date`, `_time`)
+- CSV export: `naming_convention_deviations.csv` (with --dumpdir)
+
+## MySQLTuner Foreign Key Analysis
+
+Activated with `--structstat` or `--verbose`.
+
+- Unconstrained `_id` columns: columns ending in `_id` that lack a FOREIGN KEY constraint
+- FK actions audit: warns when `ON DELETE CASCADE` is used (potential data loss risk)
+- FK type mismatches: data type differences between FK column and referenced column
+- CSV export: `missing_foreign_keys.csv` (with --dumpdir)
+
+## MySQLTuner MySQL 8.0+ / MariaDB Modeling Checks
+
+Requires MySQL 8.0+ or MariaDB 10.x+.
+
+- JSON column indexability:
+  - Detects JSON columns without Virtual Generated Columns for indexing
+  - Recommends creating generated columns for frequently searched JSON attributes
+- Invisible indexes detection:
+  - MySQL: `IS_VISIBLE = 'NO'`
+  - MariaDB: `IGNORED = 'YES'`
+- CHECK constraints inventory (MySQL 8.0.16+)
+- CSV export: `json_columns_without_virtual.csv` (with --dumpdir)
+
+## MySQLTuner Data Type Optimization
+
+Activated with `--structstat` or `--verbose`.
+
+- NULLability audit: warns when more than 20 columns have `IS_NULLABLE = 'YES'`
+- Recommends using `NOT NULL` where possible for better performance and index efficiency
+
+## MySQLTuner Schema Sanitization
+
+Activated with `--structstat` or `--verbose`.
+
+- Empty schemas detection (no tables and no views)
+- View-only schemas detection (views but no base tables)
+
+## MySQLTuner Weighted Health Score
+
+- Unified KPI aggregating findings across three dimensions:
+  - **Performance (40 points)**:
+    - Buffer Pool hit rate (10pts): >99% = 10, >95% = 5, else 0
+    - Temp tables on disk (10pts): <10% = 10, <25% = 5, else 0
+    - Thread cache hit rate (10pts): >90% = 10, >50% = 5, else 0
+    - Connection usage (10pts): <80% = 10, else 0
+  - **Security (30 points)**:
+    - Deducted for anonymous users, empty passwords, users without host restriction
+    - Deducted for insecure authentication plugins
+    - Deducted for missing SSL configuration
+  - **Resilience (30 points)**:
+    - Replication lag (10pts)
+    - Error log health (10pts)
+    - Metadata consistency (10pts)
+- Color-coded display: Green (>80), Yellow (>50), Red (≤50)
+- Stored in JSON output as `WeightedHealthScore` and `HealthScoreDetails`
+
+## MySQLTuner Predictive Capacity Analysis
+
+- **Memory Headroom**:
+  - Calculates theoretical peak memory usage vs available RAM+Swap
+  - Alerts when peak memory exceeds available resources (OOM risk)
+  - Reports headroom percentage of physical RAM
+- **Disk Growth Forecasting**:
+  - Estimates daily data growth based on current total data size and server uptime
+  - Requires minimum 24 hours of uptime for reliable estimation
+- Results stored in JSON: `Capacity.Memory.Peak`, `Capacity.Memory.Headroom`, `Capacity.Disk.DailyGrowth`
+
+## MySQLTuner Guided Auto-Fix Engine
+
+- Generates ready-to-apply SQL snippets from variable adjustment recommendations:
+  - **SET GLOBAL statements**: Immediate application without restart
+  - **[mysqld] configuration block**: For persistent my.cnf changes
+- Only generated when variable adjustments are recommended
+- Suppressed in `--silent` and `--json` modes
+
+## MySQLTuner Aborted Connections Management
+
+- Tracks aborted connections state across runs to avoid false positives
+- State file protection:
+  - Symlink verification before read/write
+  - Atomic writes to prevent corruption
+  - Transport-specific host and container identifiers in state file path to prevent collisions
+- Adjusts the aborted connections count to subtract connections caused by MySQLTuner's own password strength checks
+
+## MySQLTuner AI Agent Remediation & MCP Server Architecture
+
+- **Actionable JSON (`--agent-json`)**:
+  - Emits normalized JSON schema containing prioritized remediation recommendations.
+  - Every finding includes: `category`, `rule_id`, `risk_level` (`Low`, `Medium`, `High`, `Critical`), `impact_score` (`1`-`10`), `fix_statement` (`SET GLOBAL ...`), and `rollback_statement`.
+  - Machine-readable structure designed for deterministic AI agent execution without unstructured text parsing.
+- **Model Context Protocol (MCP) Daemon**:
+  - Lightweight Python wrapper (`build/mcp_server.py`) exposing MySQLTuner as a standardized JSON-RPC 2.0 stdio / SSE tool.
+  - Exposes tools: `run_audit`, `get_latest_audit`, `apply_recommendation`, `rollback_recommendation`.
+
+## MySQLTuner Workload Profiling & Auto-Increment Optimization
+
+- **High-Performance Table Churn & Auto-Increment Scanning**:
+  - Optimized SQL query combining `information_schema.TABLES` and `information_schema.COLUMNS` to evaluate AUTO_INCREMENT usage percentages in a single batch pass.
+  - Detects exhausted keys near the max integer limit for `TINYINT`, `SMALLINT`, `MEDIUMINT`, `INT`, and `BIGINT`.
+- **Fast-Track Workload Bypass (`--skipworkload`)**:
+  - For massive enterprise deployments (>10,000 tables), `--skipworkload` bypasses heavy information_schema joins to complete connection, memory, buffer pool, and replication diagnostics in sub-second execution times.
+
+## MySQLTuner Enhanced Galera Cluster & Group Replication
+
+- **Galera Multi-Master Diagnostics**:
+  - Evaluates `wsrep_flow_control_paused` to identify cluster-wide replication pauses and lag.
+  - Inspects `wsrep_provider_options` (`gcs.fc_limit`, `gcs.fc_factor`) to detect misconfigured replication flow thresholds.
+  - Warns on non-primary key tables (`wsrep_certify_non_pk = OFF`) and even cluster node counts risking split-brain scenarios.
+- **MySQL Group Replication & InnoDB Cluster**:
+  - Analyzes `performance_schema.replication_group_members` for node states (`ONLINE`, `RECOVERING`, `UNREACHABLE`).
+  - Audits single-primary vs multi-primary configurations and transaction certification queues.
+

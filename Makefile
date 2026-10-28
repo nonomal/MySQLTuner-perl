@@ -1,0 +1,277 @@
+VERSION=$(shell grep '\- Version ' mysqltuner.pl | awk '{ print $$NF}')
+UPDATE_SUB_VERSION=$(shell echo $(VERSION) | awk -F. '{ print $$1"."$$2"."$$3+1 }')
+UPDATE_MINOR_VERSION=$(shell echo $(VERSION) | awk -F. '{ print $$1"."$$2+1".0" }')
+UPDATE_MAJOR_VERSION=$(shell echo $(VERSION) | awk -F. '{ print $$1+1".0.0" }')
+
+.PHONY: all help generate_usage generate_release_notes generate_cve generate_features tidy check-tidy installdep_debian increment_sub_version increment_minor_version increment_major_version push pull vendor_setup test test-all test-container test-it unit-tests unit-tests-debug clean clean_examples validate_release docker_build docker_slim docker_push test-triage issue-triage issue-triage-offline issue-triage-major issue-triage-major-offline sync-major-issues sync_versions check_versions
+
+all: generate_cve generate_features generate_usage tidy increment_sub_version 
+
+help:
+	@echo "Usage: make <target>"
+	@echo "  help:              Show this help"
+	@echo "  generate_usage:    Generate USAGE.md"
+	@echo "  generate_release_notes: Regenerate releases/v[VERSION].md notes file"
+	@echo "  generate_cve:      Generate vulnerabilities.csv"
+	@echo "  generate_features: Generate FEATURES.md"
+	@echo "  tidy:              Tidy mysqltuner.pl"
+	@echo "  check-tidy:        Check if mysqltuner.pl is tidy"
+	@echo "  installdep_debian: Install dependencies on Debian"
+	@echo "  increment_sub_version: Increment sub version"
+	@echo "  increment_minor_version: Increment minor version"
+	@echo "  increment_major_version: Increment major version"
+	@echo "  push:              Push to GitHub"
+	@echo "  vendor_setup:      Setup external test repositories (multi-db-docker-env, test_db)"
+	@echo "  test:              Run database lab tests (mysql84, mariadb1011, percona80)"
+	@echo "  test-all:          Run all database lab tests"
+	@echo "  test-container:    Run tests against a specific CONTAINER (e.g. CONTAINER=my_db)"
+	@echo "  audit:             Run audit on remote HOST (e.g. HOST=db-server.com)"
+	@echo "  audit-logs:        Run local audit on laboratory logs (examples/ directory)"
+	@echo "  unit-tests:        Run unit and regression tests in tests/ directory (clean output)"
+	@echo "  unit-tests-debug:  Run unit tests with verbose debug information"
+	@echo "  clean_examples:    Cleanup examples directory (KEEP=n, default 5)"
+	@echo "  setup_commits:     Install Conventional Commits tools (Node.js)"
+	@echo "  test-ha:           Run E2E tests on all HA topologies (Galera, InnoDB Cluster, Replication)"
+	@echo "  test-ha-galera:    Run E2E tests on Galera Cluster only"
+	@echo "  test-ha-innodb:    Run E2E tests on InnoDB Cluster only"
+	@echo "  test-ha-repli:     Run E2E tests on Replication only"
+	@echo "  test-mcp-e2e:      Run MCP Server E2E tests with a real database"
+	@echo "  test-triage:       Run all Issue Triage Python & Perl unit tests"
+	@echo "  issue-triage:      Run Issue Triage Orchestrator (ISSUE=xxx, LIMIT=10)"
+	@echo "  issue-triage-offline: Run Issue Triage Orchestrator using offline replay fixtures"
+	@echo "  issue-triage-major: Run Issue Triage Orchestrator on upstream major/MySQLTuner-perl"
+	@echo "  issue-triage-major-offline: Run Issue Triage on major/MySQLTuner-perl using offline fixtures"
+	@echo "  sync-major-issues: Synchronize modifications to major/MySQLTuner-perl with jmrenouard assignee"
+	@echo "  analyze-output:    Analyze MySQLTuner output (FILE=path/to/output.txt)"
+
+
+installdep_debian: setup_commits
+	sudo apt install -y cpanminus libfile-util-perl libpod-markdown-perl libwww-mechanize-gzip-perl perltidy dos2unix
+	curl -sL https://raw.githubusercontent.com/slimtoolkit/slim/master/scripts/install-slim.sh | sudo -E bash -
+
+setup_commits:
+	@echo "Installing Conventional Commits tools..."
+	npm install
+
+tidy:
+	dos2unix ./mysqltuner.pl
+	perltidy -b ./mysqltuner.pl
+	git add ./mysqltuner.pl
+	git commit -m "style: tidy mysqltuner.pl" || echo "No changes to commit"
+
+check-tidy:
+	perltidy -st mysqltuner.pl | diff -q - mysqltuner.pl
+
+generate_usage:
+	@echo "[$$(date '+%Y-%m-%d %H:%M:%S')] [MAKE] Starting generate_usage..." >> execution.log
+	pod2markdown mysqltuner.pl >USAGE.md
+	git add ./USAGE.md
+	git commit -m "docs: generate USAGE.md" || echo "No changes to commit"
+	@echo "[$$(date '+%Y-%m-%d %H:%M:%S')] [MAKE] Finished generate_usage." >> execution.log
+
+generate_cve:
+	@echo "[$$(date '+%Y-%m-%d %H:%M:%S')] [MAKE] Starting generate_cve..." >> execution.log
+	perl ./build/updateCVElist.pl
+	git add ./vulnerabilities.csv
+	git commit -m "docs: generate vulnerabilities list" || echo "No changes to commit"
+	@echo "[$$(date '+%Y-%m-%d %H:%M:%S')] [MAKE] Finished generate_cve." >> execution.log
+
+generate_version_file:
+	@echo "[$$(date '+%Y-%m-%d %H:%M:%S')] [MAKE] Starting generate_version_file..." >> execution.log
+	rm -f CURRENT_VERSION.txt
+	grep "# mysqltuner.pl - Version" ./mysqltuner.pl | awk '{ print $$NF}' > CURRENT_VERSION.txt
+	git add ./CURRENT_VERSION.txt
+	git commit -m "chore: generate CURRENT_VERSION.txt" || echo "No changes to commit"
+	@echo "[$$(date '+%Y-%m-%d %H:%M:%S')] [MAKE] Finished generate_version_file." >> execution.log
+
+generate_eof_files:
+	@echo "[$$(date '+%Y-%m-%d %H:%M:%S')] [MAKE] Starting generate_eof_files..." >> execution.log
+	perl ./build/sync_eol_dates.pl --generate
+	git add ./*_support.md
+	git commit -m "docs: generate end-of-life status files" || echo "No changes to commit"
+	@echo "[$$(date '+%Y-%m-%d %H:%M:%S')] [MAKE] Finished generate_eof_files." >> execution.log
+
+sync_versions:
+	perl ./build/sync_supported_versions.pl
+
+check_versions:
+	perl ./build/sync_supported_versions.pl --check
+
+generate_features:
+	@echo "[$$(date '+%Y-%m-%d %H:%M:%S')] [MAKE] Starting generate_features..." >> execution.log
+	perl ./build/genFeatures.pl
+	git add ./FEATURES.md
+	git commit -m "docs: generate FEATURES.md" || echo "No changes to commit"
+	@echo "[$$(date '+%Y-%m-%d %H:%M:%S')] [MAKE] Finished generate_features." >> execution.log
+
+release:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "ERROR: VERSION is required. Usage: make release VERSION=X.XX.XX"; \
+		exit 1; \
+	fi
+	@OLD_VERSION=$$(cat CURRENT_VERSION.txt | tr -d '\n'); \
+	echo "Bumping version from $$OLD_VERSION to $(VERSION)..."; \
+	echo "$(VERSION)" > CURRENT_VERSION.txt; \
+	sed -i "s/$$OLD_VERSION/$(VERSION)/g" mysqltuner.pl README.md POTENTIAL_ISSUES.md MEMORY_DB.md Changelog; \
+	pod2markdown mysqltuner.pl > USAGE.md; \
+	perl build/release_gen.pl; \
+	echo "Version bumped to $(VERSION). USAGE.md and release notes generated."
+
+generate_release_notes:
+	@echo "[$$(date '+%Y-%m-%d %H:%M:%S')] [MAKE] Starting generate_release_notes..." >> execution.log
+	perl build/release_gen.pl
+	git add ./releases/
+	git commit -m "docs: regenerate release notes" || echo "No changes to commit"
+	@echo "[$$(date '+%Y-%m-%d %H:%M:%S')] [MAKE] Finished generate_release_notes." >> execution.log
+
+
+increment_sub_version:
+	@echo "Incrementing sub version from $(VERSION) to $(UPDATE_SUB_VERSION)"
+	sed -i "s/$(VERSION)/$(UPDATE_SUB_VERSION)/" mysqltuner.pl *.md .github/workflows/*.yml
+	git add ./*.md ./mysqltuner.pl
+	git commit -m "Generate $(UPDATE_SUB_VERSION) sub version at $(shell date --iso=seconds)"
+	git tag -a v$(UPDATE_SUB_VERSION) -m "Generate $(UPDATE_SUB_VERSION) sub version at $(shell date --iso=seconds)"
+	git push --tags
+
+increment_minor_version:
+	@echo "Incrementing minor version from $(VERSION) to $(UPDATE_MINOR_VERSION)"
+	sed -i "s/$(VERSION)/$(UPDATE_MINOR_VERSION)/" mysqltuner.pl *.md .github/workflows/*.yml
+	git add ./*.md ./mysqltuner.pl
+	git commit -m "Generate $(UPDATE_MINOR_VERSION) minor version at $(shell date --iso=seconds)"
+	git tag -a v$(UPDATE_MINOR_VERSION) -m "Generate $(UPDATE_MINOR_VERSION) minor version at $(shell date --iso=seconds)"
+	git push --tags
+
+increment_major_version:
+	@echo "Incrementing major version from $(VERSION) to $(UPDATE_MAJOR_VERSION)"
+	sed -i "s/$(VERSION)/$(UPDATE_MAJOR_VERSION)/" mysqltuner.pl *.md .github/workflows/*.yml
+	git add ./*.md ./mysqltuner.pl
+	git commit -m "Generate $(UPDATE_SUB_VERSION) major version at $(shell date --iso=seconds)"
+	git tag -a v$(UPDATE_MINOR_VERSION) -m "Generate $(UPDATE_MAJOR_VERSION) major version at $(shell date --iso=seconds)"
+	git push --tags
+
+docker_build:
+	docker build . -t jmrenouard/mysqltuner:latest -t jmrenouard/mysqltuner:$(VERSION)
+
+docker_slim:
+	docker run --rm -it --privileged -v /var/run/docker.sock:/var/run/docker.sock -v $(PWD):/root/app -w /root/app jmrenouard/mysqltuner:latest slim build
+
+validate_release:
+	perl build/validate_release.pl
+
+docker_push: docker_build validate_release
+	@echo "WARNING: Local docker_push is deprecated. Use the GitHub Actions 'docker_publish.yml' workflow for multi-arch buildx releases."
+	bash build/publishtodockerhub.sh $(VERSION)
+	
+
+vendor_setup:
+	@echo "Setting up vendor repositories..."
+	mkdir -p vendor
+	if [ ! -d "vendor/multi-db-docker-env" ]; then \
+		git clone https://github.com/jmrenouard/multi-db-docker-env vendor/multi-db-docker-env; \
+	else \
+		cd vendor/multi-db-docker-env && git pull; \
+	fi
+	if [ ! -d "vendor/test_db" ]; then \
+		git clone https://github.com/jmrenouard/test_db vendor/test_db; \
+	else \
+		cd vendor/test_db && git pull; \
+	fi
+
+test: vendor_setup
+	@echo "Running MySQLTuner Lab Tests..."
+	bash build/test_envs.sh $(CONFIGS)
+
+test-all: vendor_setup
+	@echo "Running all MySQLTuner Lab Tests..."
+	bash build/test_envs.sh `perl build/get_supported_envs.pl`
+
+test-parallel: vendor_setup
+	@echo "Running MySQLTuner Parallel Lab Tests..."
+	bash build/parallel_test.sh && $(MAKE) clean_examples KEEP=10
+
+test-container:
+	@echo "Running MySQLTuner against container: $(CONTAINER)..."
+	bash build/test_envs.sh -e "$(CONTAINER)"
+
+lab-up: vendor_setup
+	@echo "Starting Persistent MySQLTuner Lab..."
+	bash build/test_envs.sh --keep-alive $(CONFIGS)
+
+lab-down:
+	@echo "Stopping MySQLTuner Lab..."
+	cd vendor/multi-db-docker-env && make stop
+
+audit:
+	@echo "Running MySQLTuner Audit on host: $(HOST)..."
+	bash build/test_envs.sh -r "$(HOST)" -a
+
+audit-logs:
+	@echo "Running laboratory logs audit..."
+	perl build/audit_logs.pl --dir=examples --verbose
+
+test-ha: vendor_setup
+	@echo "Running MySQLTuner HA E2E Tests (all topologies)..."
+	bash build/test_ha.sh all
+
+test-ha-galera: vendor_setup
+	@echo "Running MySQLTuner HA E2E Tests (Galera)..."
+	bash build/test_ha.sh galera
+
+test-ha-innodb: vendor_setup
+	@echo "Running MySQLTuner HA E2E Tests (InnoDB Cluster)..."
+	bash build/test_ha.sh innodb
+
+test-ha-repli: vendor_setup
+	@echo "Running MySQLTuner HA E2E Tests (Replication)..."
+	bash build/test_ha.sh repli
+
+test-mcp-e2e:
+	@echo "Running MCP Server E2E Tests..."
+	prove -v tests/e2e_mcp_server.t
+
+analyze-output:
+	@echo "Analyzing MySQLTuner output..."
+	perl build/analyze_mt_output.pl $(FILE)
+
+unit-tests:
+	@echo "Running unit and regression tests..."
+	perl ./build/audit_tests.pl
+
+unit-tests-debug:
+	@echo "Running unit and regression tests (debug mode)..."
+	perl ./build/audit_tests.pl --debug
+
+clean_examples:
+	@echo "Cleaning up examples..."
+	bash build/clean_examples.sh $(KEEP)
+
+test-triage:
+	@echo "Running Issue Triage unit tests..."
+	python3 -m unittest discover -s tests -p "unit_*.py"
+	prove -I. -Itests tests/unit_issue_triage_bridge.t tests/unit_edge_case_triage_resilience.t
+
+issue-triage:
+	@echo "Running Issue Triage Orchestrator (Dry Run)..."
+	PYTHONPATH=. python3 build/issue_triage/triage_orchestrator.py $(if $(ISSUE),--issue $(ISSUE),) $(if $(LIMIT),--limit $(LIMIT),)
+
+issue-triage-offline:
+	@echo "Running Issue Triage Orchestrator (Offline Mode)..."
+	PYTHONPATH=. python3 build/issue_triage/triage_orchestrator.py --offline $(if $(ISSUE),--issue $(ISSUE),) $(if $(LIMIT),--limit $(LIMIT),)
+
+issue-triage-major:
+	@echo "Running Upstream Issue Triage Orchestrator (major/MySQLTuner-perl)..."
+	PYTHONPATH=. python3 build/issue_triage/triage_orchestrator.py --repo major/MySQLTuner-perl $(if $(ISSUE),--issue $(ISSUE),) $(if $(LIMIT),--limit $(LIMIT),)
+
+issue-triage-major-offline:
+	@echo "Running Upstream Issue Triage Orchestrator (Offline Mode - major/MySQLTuner-perl)..."
+	PYTHONPATH=. python3 build/issue_triage/triage_orchestrator.py --repo major/MySQLTuner-perl --offline $(if $(ISSUE),--issue $(ISSUE),) $(if $(LIMIT),--limit $(LIMIT),)
+
+sync-major-issues:
+	@echo "Synchronizing modifications to major/MySQLTuner-perl..."
+	PYTHONPATH=. python3 build/issue_triage/triage_orchestrator.py --sync-upstream $(if $(ISSUE),--issue $(ISSUE),) $(if $(LIMIT),--limit $(LIMIT),)
+
+push:
+	git push
+
+pull:
+	git pull
